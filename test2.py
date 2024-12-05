@@ -1,9 +1,3 @@
-import os
-import sys
-
-cwd = os.getcwd()
-sys.path.append(cwd)
-
 # %jupyter_snippet import
 import pinocchio as pin
 from utils.meshcat_viewer_wrapper import MeshcatVisualizer
@@ -223,13 +217,3 @@ while True:
         break
     print("Failed ... let's try again! ")
 # %end_jupyter_snippet
-    
-# ---------------------------------- 
-# KEEP SCRIPT RUNNING 
-# ---------------------------------- 
-
-print("Keep Meshcat server alive")
-
-# Keep the script running to keep the Meshcat server alive
-while True:
-    time.sleep(1)

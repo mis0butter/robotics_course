@@ -99,8 +99,8 @@ def compute_distance_target(q):
     return distance 
 
 # test function 
-distance = compute_distance_target(robot.q0) 
-print("Distance to target = ", distance) 
+dist_target = compute_distance_target(robot.q0) 
+print("Distance to target = ", dist_target) 
 
 # ---------------------------------- 
 # RANDOM SEARCH OF VALID CONFIGURATION 
@@ -160,15 +160,19 @@ def make_random_descent(q0 = None):
             q = qtry 
             hist.append( q.copy() ) 
             vis.display(q) 
-            time.sleep(5e-3) 
+            time.sleep(1) 
     
     return hist 
 
-make_random_descent() 
+# test function 
+hist = make_random_descent() 
+print("History of configurations = ", hist) 
 
 # ---------------------------------- 
+# CONFIGURATION SPACE 
+# ---------------------------------- 
 
-def compute_min_dist_env(q): 
+def find_min_distance_collision(q): 
     ''' 
     Compute the minimum distance between the robot and the obstacles. 
     '''
@@ -180,19 +184,116 @@ def compute_min_dist_env(q):
     if is_collision: 
         return 0.0 
 
-    # Compute the distance between each collision pair for a given GeometryModel and associated GeometryData.
+    # Compute distance between each collision pair for a given GeometryModel and associated GeometryData.
     distance_idx = pin.computeDistances(robot.collision_model,robot.collision_data) 
     min_distance = robot.collision_data.distanceResults[distance_idx].min_distance 
 
     return min_distance 
 
 # test function 
-min_distance = compute_min_dist_env(robot.q0) 
+min_distance = find_min_distance_collision(robot.q0) 
 print("Minimum distance to environment = ", min_distance) 
 
+# ---------------------------------- 
 
+def sample_config_space(num_samples=500):
+    ''' 
+    Sample num_samples configurations and store in two lists: 
+        - hist_coll - if config is in collision 
+        - hist_free - if config is in free space 
+    along with distance to the target and distance to obstacles. 
+    '''
+    
+    hist_coll = [] 
+    hist_free = [] 
+    
+    for i in range(num_samples): 
+        
+        q            = sample_valid_config(check = False) 
+        dist_target  = compute_distance_target(q) 
+        is_collision = check_collision(q) 
+        
+        if is_collision:             
+            hist_coll.append( list(q.flat) + [ dist_target, 1e-2 ] ) 
+        else: 
+            dist_coll = find_min_distance_collision(q) 
+            hist_free.append( list(q.flat) + [ dist_target, dist_coll ] ) 
+    
+    return hist_coll, hist_free 
 
+# ---------------------------------- 
 
+def plot_config_space(hist_coll, hist_free, marker_size = 20): 
+    '''
+    Plot 2 "scatter" plots: the first one plot the distance to the target for 
+    each configuration, the second plots the distance to the obstacles (axis q1,q2, 
+    distance in the color space).
+    ''' 
+    
+    hist_total = hist_coll + hist_free 
+    h          = np.array(hist_total)      
+    
+    fig, axs = plt.subplots(2, 1 , figsize=(10, 8))
+    
+    axs[0].scatter(h[:,0], h[:,1], c=h[:,2], s=marker_size, lw=0)
+    axs[0].set_title("Distance to the target")
+    fig.colorbar(axs[0].collections[0], ax=axs[0])
+    
+    axs[1].scatter(h[:,0], h[:,1], c=h[:,3], s=marker_size, lw=0)
+    axs[1].set_title("Distance to the obstacles")
+    fig.colorbar(axs[1].collections[0], ax=axs[1])
+     
+    # plt.tight_layout()
+    
+    return fig, axs
+
+# test 
+hist_coll, hist_free = sample_config_space(num_samples = 5000) 
+fig, axs = plot_config_space(hist_coll, hist_free)
+
+# Example of augmenting the plot
+axs[0].set_xlabel('Joint 1')
+axs[0].set_ylabel('Joint 2')
+axs[1].set_xlabel('Joint 1')
+axs[1].set_ylabel('Joint 2')
+
+print("Plot of configuration space displayed") 
+# plt.show()
+print("Plot updated") 
+
+# test 
+hist_coll, hist_free = sample_config_space(num_samples = 5000) 
+plot_config_space(hist_coll, hist_free) 
+
+# ---------------------------------- 
+# Display feasible trajectory by random walk 
+# ---------------------------------- 
+ 
+q_init = np.array( [-1.1, -3.] ) 
+
+for i in range(100): 
+    
+    traj        = make_random_descent(q_init) 
+    dist_target = compute_distance_target(traj[-1]) 
+    
+    if dist_target < 5e-2: 
+        print('Found feasible trajectory') 
+        break 
+
+traj = np.array(traj) 
+
+# choose trajectory end to be in [pi, -pi] through angle normalization: 
+#   traj[-1]    - Gets the last element of the trajectory array
+#   + np.pi     - Shifts the angle by +π
+#   % (2*np.pi) - Uses modulo to wrap the angle into [0, 2π]
+#   - np.pi     - Shifts back by -π to get into [-π, π] range
+q_end = ( traj[-1] + np.pi ) % ( 2*np.pi ) - np.pi 
+traj += ( q_end - traj[-1] )   
+
+# plt.ion()  # Turn on interactive mode
+fig, axs = plot_config_space(hist_coll, hist_free) 
+axs[0].plot( traj[:,0], traj[:,1], color = 'black', lw = 2 ) 
+plt.show(block=False)
     
 # ---------------------------------- 
 # KEEP SCRIPT RUNNING 
@@ -204,5 +305,7 @@ print("Keep Meshcat server alive")
 while True:
     time.sleep(1)
     
+
+
 
     
