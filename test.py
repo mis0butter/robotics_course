@@ -53,7 +53,7 @@ target = Target(vis, position = target_pos)
 
 # ---------------------------------- 
 
-def compute_position_end_eff(q): 
+def get_position_end_eff(q): 
     ''' 
     Return the position of the end effector in 2D. 
     '''
@@ -65,7 +65,7 @@ def compute_position_end_eff(q):
     return position 
 
 # test function 
-position = compute_position_end_eff(robot.q0) 
+position = get_position_end_eff(robot.q0) 
 print("End effector position = ", position ) 
  
 # ---------------------------------- 
@@ -92,7 +92,7 @@ def compute_distance_target(q):
     Return the distance between the end effector and the target (2d).
     '''
     
-    pos_end_eff = compute_position_end_eff(q) 
+    pos_end_eff = get_position_end_eff(q) 
     target_pos  = target.position  
     distance    = norm( pos_end_eff - target_pos )  
     
@@ -129,30 +129,74 @@ print("Random configuration = ", q)
 
 vis.display(q) 
 
-# # ----------------------------------
-# # FROM RANDOM CONFIGURATION TO TARGET 
-# # ----------------------------------
+# ----------------------------------
+# FROM RANDOM CONFIGURATION TO TARGET 
+# ----------------------------------
 
-# def compute_random_descent(q0 = None): 
-#     ''' 
-#     Make a random walk of 0.1 steps toward the target. 
-#     Return the list of configurations visited. 
-#     '''
+def make_random_descent(q0 = None): 
+    ''' 
+    Make a random walk of 0.1 steps toward the target. 
+    Return the list of configurations visited. 
+    '''
     
-#     if q0 is None: 
-#         q = sample_random_config(check = True) 
-#     else: 
-#         q = q0 
+    if q0 is None: 
+        q = sample_valid_config(check = True) 
+    else: 
+        q = q0 
         
-#     hist = [ q.copy() ] 
+    hist = [ q.copy() ] 
+        
+    for i in range(100): 
+        
+        # choose a random step 
+        dq      = sample_valid_config() * 0.1 
+        qtry    = q + dq 
+        
+        distance_q     = compute_distance_target(q) 
+        distance_qtry  = compute_distance_target(qtry) 
+        collision_qtry = check_collision(qtry) 
+        
+        if distance_q > distance_qtry and not collision_qtry: 
+            q = qtry 
+            hist.append( q.copy() ) 
+            vis.display(q) 
+            time.sleep(5e-3) 
     
-#     return hist 
+    return hist 
 
-# compute_random_descent() 
+make_random_descent() 
+
+# ---------------------------------- 
+
+def compute_min_dist_env(q): 
+    ''' 
+    Compute the minimum distance between the robot and the obstacles. 
+    '''
+
+    pin.updateGeometryPlacements(robot.model,robot.data,robot.collision_model,robot.collision_data,q)
+
+    is_collision = pin.computeCollisions(robot.collision_model,robot.collision_data, False) 
+
+    if is_collision: 
+        return 0.0 
+
+    # Compute the distance between each collision pair for a given GeometryModel and associated GeometryData.
+    distance_idx = pin.computeDistances(robot.collision_model,robot.collision_data) 
+    min_distance = robot.collision_data.distanceResults[distance_idx].min_distance 
+
+    return min_distance 
+
+# test function 
+min_distance = compute_min_dist_env(robot.q0) 
+print("Minimum distance to environment = ", min_distance) 
+
+
+
+
     
-# ----------------------------------
+# ---------------------------------- 
 # KEEP SCRIPT RUNNING 
-# ----------------------------------
+# ---------------------------------- 
 
 print("Keep Meshcat server alive")
 
