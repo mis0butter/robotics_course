@@ -1,12 +1,14 @@
+# ---------------------------------- 
+# SET UP 
+# ---------------------------------- 
+
 import os
 import sys
 
 sys.path.append( os.getcwd() )
 
-# debugging 
 import pdb 
 
-# ---------------------------------- 
 # ---------------------------------- 
 
 import pinocchio as pin
@@ -21,6 +23,9 @@ import matplotlib.pylab as plt
 # matplotlib with interactive setting
 plt.ion()  
 
+# ---------------------------------- 
+# ---------------------------------- 
+
 robot = load_ur5_with_obstacles(reduced=True)
 
 viz = MeshcatVisualizer(robot)
@@ -29,6 +34,7 @@ viz.display(robot.q0)
 target = Target(viz,position = np.array([.5,.5]))
 
 # ---------------------------------- 
+# USING ROBOT MODEL 
 # ---------------------------------- 
 
 def get_position_end_eff(q):
@@ -77,6 +83,7 @@ def find_min_collision_distance(q):
      return robot.collision_data.distanceResults[idx].min_distance
 
 # ---------------------------------- 
+# RANDOM SEARCH OF VALID CONFIGURATION 
 # ---------------------------------- 
 
 def sample_small_distance(threshold=5e-2, display=False):
@@ -98,10 +105,13 @@ def sample_small_distance(threshold=5e-2, display=False):
 viz.display(sample_small_distance())
 
 # ---------------------------------- 
+# FROM RANDOM CONFIGURATION TO TARGET 
 # ---------------------------------- 
 
-# Random descent: crawling from one free configuration to the target with random steps.
-def randomDescent(q0 = None):
+def walk_random_descent(q0 = None):
+     ''' 
+     Random descent: crawling from one free configuration to the target with random steps. 
+     '''
      
      q = sample_random_config(check=True) if q0 is None else q0
      hist = [ q.copy() ]
@@ -110,11 +120,12 @@ def randomDescent(q0 = None):
           
           # Choose a random step and apply 
           dq = sample_random_config()*.1 
-          qtry = q+dq 
+          qtry = q + dq 
                     
           # if distance decreases without collision ... 
-          if compute_distance_end_target(q) > compute_distance_end_target(q+dq) and not check_collision(q+dq): 
-               q = q+dq                 # keep the step
+          if compute_distance_end_target(q) > compute_distance_end_target(qtry) and not check_collision(qtry): 
+               
+               q = qtry                 # keep the step
                hist.append(q.copy())    # keep a trace of it
                viz.display(q)           # display it
                time.sleep(5e-3)         # and sleep for a short while
@@ -122,51 +133,79 @@ def randomDescent(q0 = None):
      return hist 
 
 # ---------------------------------- 
+# CONFIGURATION SPACE 
 # ---------------------------------- 
 
-def sampleSpace(nbSamples=500):
-     '''
-     Sample nbSamples configurations and store them in two lists depending
-     if the configuration is in free space (hfree) or in collision (hcol), along
-     with the distance to the target and the distance to the obstacles.
-     '''
-     hcol = []
-     hfree = []
-     for i in range(nbSamples):
-          q = sample_random_config(False)
-          if not check_collision(q):
-               hfree.append( list(q.flat) + [ compute_distance_end_target(q), find_min_collision_distance(q) ])
-          else:
-               hcol.append(  list(q.flat) + [ compute_distance_end_target(q), 1e-2 ])
-     return hcol,hfree
+def compute_min_distance_env(q):
+     ''' 
+     Return the minimal distance between robot and environment. 
+     ''' 
+     
+     pin.updateGeometryPlacements(robot.model,robot.data,robot.collision_model,robot.collision_data,q)
+     
+     is_collision = pin.computeCollisions(robot.collision_model,robot.collision_data,False)
+     
+     if is_collision: 
+         return 0.0 
+    
+     idx = pin.computeDistances(robot.collision_model,robot.collision_data)
+     min_distance = robot.collision_data.distanceResults[idx].min_distance 
+     
+     return min_distance 
 
-def plotConfigurationSpace(hcol,hfree,markerSize=20):
+def sample_config_space(num_samples = 500):
+     ''' 
+     Sample num_samples configurations and store them in two lists 
+     depending if the configuration is in free space (hfree) or in 
+     collision (hcol), along with the distance to the target and the 
+     distance to the obstacles. 
+     ''' 
+     
+     hist_coll = [] 
+     hist_free = [] 
+     
+     for i in range(num_samples): 
+          
+          q = sample_random_config(False) 
+          
+          if not check_collision(q):
+               hist_free.append( list(q.flat) + [ compute_distance_end_target(q), find_min_collision_distance(q) ])
+          else:
+               hist_coll.append( list(q.flat) + [ compute_distance_end_target(q), 1e-2 ]) 
+               
+     return hist_coll, hist_free 
+
+# ---------------------------------- 
+
+def plot_config_space(hist_coll, hist_free, marker_size = 20):
      '''
      Plot 2 "scatter" plots: the first one plot the distance to the target for 
      each configuration, the second plots the distance to the obstacles (axis q1,q2, 
      distance in the color space).
      '''
-     htotal = hcol + hfree
-     h=np.array(htotal)
+     
+     hist_total = hist_coll + hist_free 
+     h = np.array(hist_total) 
+     
      plt.subplot(2,1,1)
-     plt.scatter(h[:,0],h[:,1],c=h[:,2],s=markerSize,lw=0)
+     plt.scatter(h[:,0], h[:,1], c = h[:,2], s = marker_size,lw = 0)
      plt.title("Distance to the target")
-     plt.colorbar()
+     plt.colorbar() 
+     
      plt.subplot(2,1,2)
-     plt.scatter(h[:,0],h[:,1],c=h[:,3],s=markerSize,lw=0)
+     plt.scatter(h[:,0], h[:,1], c = h[:,3], s = marker_size, lw = 0)
      plt.title("Distance to the obstacles")
-     plt.colorbar()
+     plt.colorbar() 
 
-hcol,hfree = sampleSpace(100)
-plotConfigurationSpace(hcol,hfree)
+hist_coll, hist_free = sample_config_space(100) 
+plot_config_space(hist_coll, hist_free) 
 
 # ---------------------------------- 
-# ---------------------------------- 
 
-### Plot random trajectories in the same plot
+# Plot random trajectories in the same plot
 qinit = np.array([-1.1, -3. ])
 for i in range(100):
-     traj = randomDescent(qinit)
+     traj = walk_random_descent(qinit)
      if compute_distance_end_target(traj[-1])<5e-2:
           print('We found a good traj!')
           break
@@ -181,50 +220,80 @@ traj += (qend-traj[-1])
 plt.plot(traj[:,0],traj[:,1],'r',lw=5) 
 
 # ---------------------------------- 
+# OPTIMIZATION 
 # ---------------------------------- 
 
-# %jupyter_snippet optim
-def cost(q):
-    """
-    Cost function: distance to the target.
-    """
-    return compute_distance_end_target(q) ** 2
+def compute_cost(q):
+     '''
+     Cost function: distance to the target.
+     '''
+     return compute_distance_end_target(q) ** 2
 
 
-def constraint(q):
-    """
-    Constraint function: distance to the obstacle should be strictly positive.
-    """
-    min_collision_dist = 0.01  # [m]
-    return find_min_collision_distance(q) - min_collision_dist
+def define_constraint(q):
+     '''
+     Constraint function: distance to the obstacle should be strictly positive.
+     '''
+     min_collision_dist = 0.01  # [m]
+     return find_min_collision_distance(q) - min_collision_dist
 
 
-def callback(q):
-    """
-    At each optimization step, display the robot configuration.
-    """
-    viz.display(q)
-    time.sleep(0.01)
+def display_callback(q):
+     ''' 
+     At each optimization step, display the robot configuration.
+     ''' 
+     viz.display(q)
+     time.sleep(0.01)
 
 
 def optimize():
      '''
-     Optimize from an initial random configuration to discover a collision-free
-     configuration as close as possible to the target. 
+     Optimize from an initial random configuration to discover a 
+     collision-free configuration as close as possible to the target. 
+
+     Returns: results from fmin_slsqp optimization tuple containing:
+          - x:     The optimized configuration
+          - fx:    Final function value 
+          - its:   Number of iterations
+          - imode: Exit mode from optimizer
+          - smode: Status message
      '''
-     return fmin_slsqp(x0=sample_random_config(check=True),
-                       func=cost,
-                       f_ieqcons=constraint,callback=callback,
-                       full_output=1)
-optimize()
+     
+     # Start from a random configuration that is collision-free
+     x0 = sample_random_config(check = True)
+
+     # Set objective function (minimize distance to target)
+     function = compute_cost
+
+     # Set constraint function (stay away from obstacles)
+     inequality_constraints = define_constraint
+
+     # Function to call at each iteration to visualize progress
+     callback = display_callback
+
+     # Get detailed output from optimizer
+     full_output = 1
+     
+     # Run Sequential Least Squares Programming optimization
+     return fmin_slsqp(  x0          = x0,
+                         func        = function,
+                         f_ieqcons   = inequality_constraints,
+                         callback    = callback,
+                         full_output = full_output)
+     
+optimize() 
 
 while True:
-    res=optimize()
-    q=res[0]
+     
+    result = optimize()
+    q      = result[0]
+    
     viz.display(q)
-    if res[4]=='Optimization terminated successfully' and res[1]<1e-6:
+    
+    if result[4] == 'Optimization terminated successfully' and result[1]<1e-6:
         print('Finally successful!')
-        break
+        break 
+   
     print("Failed ... let's try again! ")
     
 # ---------------------------------- 
@@ -233,8 +302,8 @@ while True:
 
 # print("Keep Meshcat server alive")
 
-# while True:
+# while True: 
 #     time.sleep(1)
 
-print("show plot")
-plt.show(block=True) 
+print("show plot") 
+plt.show(block=True)  

@@ -1,15 +1,22 @@
-'''
-Stand-alone program to optimize the configuration q=[q1,q2] of a 2-R robot with
-scipy BFGS.
-'''
+import os 
+import sys 
 
-# %jupyter_snippet import
+sys.path.append( os.getcwd() ) 
+
+import pdb 
+
+# ---------------------------------- 
+
+# Stand-alone program to optimize the configuration q=[q1,q2] of a 2-R robot with scipy BFGS.
+
 import time
 import numpy as np
-from scipy.optimize import fmin_bfgs,fmin_slsqp
-from utils.meshcat_viewer_wrapper import MeshcatVisualizer,translation2d,planar
-from numpy.linalg import norm,inv,pinv,svd,eig
-# %end_jupyter_snippet
+from scipy.optimize import fmin_bfgs, fmin_slsqp
+from utils.meshcat_viewer_wrapper import MeshcatVisualizer, translation2d,planar
+from numpy.linalg import norm, inv, pinv, svd, eig
+
+# ---------------------------------- 
+# ---------------------------------- 
 
 viz = MeshcatVisualizer(url='classical')
 
