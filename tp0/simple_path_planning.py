@@ -300,10 +300,10 @@ while True:
 # KEEP SCRIPT RUNNING 
 # ---------------------------------- 
 
-# print("Keep Meshcat server alive")
+# print("Keep Meshcat server alive") 
 
 # while True: 
 #     time.sleep(1)
 
 print("show plot") 
-plt.show(block=True)  
+plt.show(block=True) 
