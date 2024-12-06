@@ -87,7 +87,7 @@ collision = check_collision(robot.q0)
 
 # ---------------------------------- 
 
-def compute_distance_target(q): 
+def compute_distance_end_target(q): 
     ''' 
     Return the distance between the end effector and the target (2d).
     '''
@@ -99,14 +99,14 @@ def compute_distance_target(q):
     return distance 
 
 # test function 
-dist_target = compute_distance_target(robot.q0) 
+dist_target = compute_distance_end_target(robot.q0) 
 print("Distance to target = ", dist_target) 
 
 # ---------------------------------- 
 # RANDOM SEARCH OF VALID CONFIGURATION 
 # ---------------------------------- 
 
-def sample_valid_config(check = False): 
+def sample_random_config(check = False): 
     ''' 
     Sample the configuration space until a free configuration is found. 
         - If 'check' is True, then this configuration is valid, i.e. NOT in collision. 
@@ -124,7 +124,7 @@ def sample_valid_config(check = False):
             return q_random
        
 # test function 
-q = sample_valid_config(check = True) 
+q = sample_random_config(check = True) 
 print("Random configuration = ", q) 
 
 vis.display(q) 
@@ -140,7 +140,7 @@ def make_random_descent(q0 = None):
     '''
     
     if q0 is None: 
-        q = sample_valid_config(check = True) 
+        q = sample_random_config(check = True) 
     else: 
         q = q0 
         
@@ -149,11 +149,11 @@ def make_random_descent(q0 = None):
     for i in range(100): 
         
         # choose a random step 
-        dq      = sample_valid_config() * 0.1 
+        dq      = sample_random_config() * 0.1 
         qtry    = q + dq 
         
-        distance_q     = compute_distance_target(q) 
-        distance_qtry  = compute_distance_target(qtry) 
+        distance_q     = compute_distance_end_target(q) 
+        distance_qtry  = compute_distance_end_target(qtry) 
         collision_qtry = check_collision(qtry) 
         
         if distance_q > distance_qtry and not collision_qtry: 
@@ -172,7 +172,7 @@ print("History of configurations = ", hist)
 # CONFIGURATION SPACE 
 # ---------------------------------- 
 
-def find_min_distance_collision(q): 
+def find_min_collision_distance(q): 
     ''' 
     Compute the minimum distance between the robot and the obstacles. 
     '''
@@ -191,7 +191,7 @@ def find_min_distance_collision(q):
     return min_distance 
 
 # test function 
-min_distance = find_min_distance_collision(robot.q0) 
+min_distance = find_min_collision_distance(robot.q0) 
 print("Minimum distance to environment = ", min_distance) 
 
 # ---------------------------------- 
@@ -209,14 +209,14 @@ def sample_config_space(num_samples=500):
     
     for i in range(num_samples): 
         
-        q            = sample_valid_config(check = False) 
-        dist_target  = compute_distance_target(q) 
+        q            = sample_random_config(check = False) 
+        dist_target  = compute_distance_end_target(q) 
         is_collision = check_collision(q) 
         
         if is_collision:             
             hist_coll.append( list(q.flat) + [ dist_target, 1e-2 ] ) 
         else: 
-            dist_coll = find_min_distance_collision(q) 
+            dist_coll = find_min_collision_distance(q) 
             hist_free.append( list(q.flat) + [ dist_target, dist_coll ] ) 
     
     return hist_coll, hist_free 
@@ -274,7 +274,7 @@ q_init = np.array( [-1.1, -3.] )
 for i in range(100): 
     
     traj        = make_random_descent(q_init) 
-    dist_target = compute_distance_target(traj[-1]) 
+    dist_target = compute_distance_end_target(traj[-1]) 
     
     if dist_target < 5e-2: 
         print('Found feasible trajectory') 
@@ -293,7 +293,7 @@ traj += ( q_end - traj[-1] )
 # plt.ion()  # Turn on interactive mode
 fig, axs = plot_config_space(hist_coll, hist_free) 
 axs[0].plot( traj[:,0], traj[:,1], color = 'black', lw = 2 ) 
-plt.show(block=False)
+plt.show(block=True)
     
 # ---------------------------------- 
 # KEEP SCRIPT RUNNING 
@@ -303,7 +303,7 @@ print("Keep Meshcat server alive")
 
 # Keep the script running to keep the Meshcat server alive
 while True:
-    time.sleep(1)
+    time.sleep(1) 
     
 
 
