@@ -13,7 +13,7 @@ import pdb
 
 # ---------------------------------- 
 
-import time
+import time 
 import numpy as np
 from scipy.optimize import fmin_bfgs, fmin_slsqp 
 from utils.meshcat_viewer_wrapper import MeshcatVisualizer,translation2d, planar 
@@ -26,23 +26,23 @@ from numpy.linalg import norm, inv, pinv, svd, eig
 viz = MeshcatVisualizer()
 # viz = MeshcatVisualizer(url = 'classical')
 
-# viz.addSphere( 'joint1', .1, [1,0,0,1] ) 
-# viz.addSphere( 'joint2', .1, [1,0,0,1] ) 
-# viz.addSphere( 'joint3', .1, [1,0,0,1] ) 
-# viz.addCylinder( 'arm1', .75,.05, [.65,.65,.65,1] ) 
-# viz.addCylinder( 'arm2', .75,.05, [.65,.65,.65,1] ) 
-# viz.addSphere( 'target', .1001, [0,.8,.1,1] ) 
+viz.addSphere( 'joint1', .1, [1,0,0,1] ) 
+viz.addSphere( 'joint2', .1, [1,0,0,1] ) 
+viz.addSphere( 'joint3', .1, [1,0,0,1] ) 
+viz.addCylinder( 'arm1', .75,.05, [.65,.65,.65,1] ) 
+viz.addCylinder( 'arm2', .75,.05, [.65,.65,.65,1] ) 
+viz.addSphere( 'target', .1001, [0,.8,.1,1] ) 
 
 # ---------------------------------- 
 
-def display_9(ps):
+def display_9(pose):
     ''' 
     Display the robot in the Viewer. 
     '''
     
-    assert (ps.shape == (9, ))
+    assert (pose.shape == (9, ))
     
-    x1, y1, theta1, x2, y2, theta2, x3, y3, theta3 = ps 
+    x1, y1, theta1, x2, y2, theta2, x3, y3, theta3 = pose 
     
     dx1 = np.cos(theta1) ; dy1 = np.sin(theta1) 
     dx2 = np.cos(theta2) ; dy2 = np.sin(theta2) 
@@ -58,54 +58,64 @@ display_9( np.array( [0,0,0,1,1,0,2,2,0] ) )
 
 # ---------------------------------- 
 
-def endeffector_9(ps):
-    assert (ps.shape == (9, ))
-    x1, y1, t1, x2, y2, t2, x3, y3, t3 = ps
+def get_endeffector_9(pose):
+    assert (pose.shape == (9, ))
+    x1, y1, t1, x2, y2, t2, x3, y3, t3 = pose
     return np.array([x3, y3])
 
 
-# target = np.array([.5, .5])
-# viz.applyConfiguration('target',translation2d(target[0],target[1]))
+target = np.array([.5, .5])
+viz.applyConfiguration('target',translation2d(target[0],target[1]))
 
-# # %jupyter_snippet cost
-# def cost_9(ps):
-#     eff = endeffector_9(ps)
-#     return norm(eff - target)**2
-# # %end_jupyter_snippet
+# ---------------------------------- 
 
-# # %jupyter_snippet constraint
-# def constraint_9(ps):
-#     assert (ps.shape == (9, ))
-#     x1, y1, t1, x2, y2, t2, x3, y3, t3 = ps
-#     res = np.zeros(6)
-#     res[0] = x1 - 0
-#     res[1] = y1 - 0
-#     res[2] = x1 + np.cos(t1) - x2
-#     res[3] = y1 + np.sin(t1) - y2
-#     res[4] = x2 + np.cos(t2) - x3
-#     res[5] = y2 + np.sin(t2) - y3
-#     return res
-# # %end_jupyter_snippet
+def compute_cost_9(pose):
+    eff = get_endeffector_9(pose)
+    return norm(eff - target)**2 
 
-# # %jupyter_snippet penalty
-# def penalty(ps):
-#     return cost_9(ps) + 10 * sum(np.square(constraint_9(ps)))
-# # %end_jupyter_snippet
+def constraint_9(pose):
+    
+    assert (pose.shape == (9, ))
+    x1, y1, t1, x2, y2, t2, x3, y3, t3 = pose
+    
+    constraints = np.zeros(6)
+    constraints[0] = x1 - 0
+    constraints[1] = y1 - 0
+    constraints[2] = x1 + np.cos(t1) - x2
+    constraints[3] = y1 + np.sin(t1) - y2
+    constraints[4] = x2 + np.cos(t2) - x3
+    constraints[5] = y2 + np.sin(t2) - y3
+    
+    return constraints 
 
-# # %jupyter_snippet callback
-# def callback_9(ps):
-#     display_9(ps)
-#     time.sleep(.5)
-# # %end_jupyter_snippet
+# ---------------------------------- 
 
-# x0 = np.array([ 0.0,] * 9)
+def compute_penalty(pose):
+    return compute_cost_9(pose) + 10 * sum(np.square(constraint_9(pose)))
 
-# with_bfgs = 0
-# if with_bfgs:
-#     xopt = fmin_bfgs(penalty, x0, callback=callback_9)
-# else:
-#     xopt = fmin_slsqp(cost_9, x0, callback=callback_9, f_eqcons=constraint_9, iprint=2, full_output=1)[0]
-# print('\n *** Xopt = %s\n\n\n\n' % xopt)
+def display_callback_9(pose):
+    display_9(pose)
+    time.sleep(.5)
+
+x0 = np.array([ 0.0,] * 9)
+
+with_bfgs = 0
+if with_bfgs:
+    xopt = fmin_bfgs(
+        compute_penalty, 
+        x0, 
+        callback = display_callback_9
+        )
+else:
+    xopt = fmin_slsqp(
+        compute_cost_9, 
+        x0, 
+        callback = display_callback_9, 
+        f_eqcons = constraint_9, 
+        iprint = 2, 
+        full_output = 1
+        )[0]
+print('\n *** Xopt = %s\n\n\n\n' % xopt)
 
 # ---------------------------------- 
 # KEEP SCRIPT RUNNING 
